@@ -1,0 +1,282 @@
+<template>
+  <div class="demo-page">
+    <block if="{{codestr}}">
+      <text class="title">您有新的{{ codestr.kd }}快递到达{{ codestr.yz }}</text>
+      <div class="codes">
+        <div for="{{codestr.codes}}" class="code">
+          <text>{{ $item }}</text>
+        </div>
+      </div>
+      <input class="btn" type="button" value="保存" onclick="saveData" />
+    </block>
+    <block else="">
+      <text class="title">等待数据传输</text>
+
+    </block>
+  </div>
+</template>
+
+<script>
+import router from "@system.router"
+import configuration from "@system.configuration"
+import app from "@system.app"
+const interconnect = require("@system.interconnect")
+let conn = null
+import storage from "@system.storage"
+import vibrator from "@system.vibrator"
+import prompt from "@system.prompt"
+export default {
+  // 页面级组件的数据模型，影响传入数据的覆盖机制：private内定义的属性不允许被覆盖
+  private: {
+    title: "腕上取件码",
+    codestrtype: "",
+    codestr: null,
+    device_status: "",
+    device_connect: false,
+    device_code: "",
+    conn: null,
+    device_status2: "",
+    conn_open: "false"
+  },
+  routeBack() {
+    app.terminate()
+  },
+  saveData() {
+    let codes = this.codestr.codes
+    let yz = this.codestr.yz
+    let kd = this.codestr.kd
+
+    storage.get({
+      key: "data",
+      default: "[]",
+      success: function (data) {
+        console.log("handling success")
+        // 将 str 解析成 object 数组
+        let code_orgin = JSON.parse(data)
+
+        for (let i = 0; i < codes.length; i++) {
+          // 检查 code 是否已经存在
+          let obj = {
+            code: codes[i],
+            kd: kd,
+            yz: yz,
+            status: 0
+          }
+          let index = code_orgin.indexOf(obj)
+          console.info(index)
+          if (index !== -1) {
+            console.info("该取件码已存在")
+
+            prompt.showToast({
+              message: "该取件码已存在",
+              duration: 1500
+            })
+            continue
+          }
+
+          code_orgin.push(obj)
+        }
+        storage.set({
+          key: "data",
+          value: JSON.stringify(code_orgin),
+          success: function (data) {
+            console.log("handling success")
+            app.terminate()
+          },
+          fail: function (data, code) {
+            console.log(`handling fail, code = ${code}`)
+            prompt.showToast({
+              message: "保存出错",
+              duration: 1500
+            })
+          }
+        })
+      },
+      fail: function (data, code) {
+        console.log(`handling fail, code = ${code}`)
+      }
+    })
+  },
+
+  connectDevice() {
+    this.onShow()
+  },
+  onShow() {
+    let that = this
+
+    this.device_status2 = "创建连接哦之前"
+    //this.codestr = {
+    //  codes:["3432434","34-98-3432","34-102-1033"],
+    //  yz:"丰巢快递柜",
+    //  kd:"顺丰"
+    //}
+
+    conn = interconnect.instance()
+    this.device_status2 = "创建连接对象"
+
+    this.conn = conn
+    this.device_status2 = "连接中"
+
+    conn.onopen = () => {
+      that.conn_open = "连接打开"
+      console.log(`connection opened`)
+      conn.send({
+        data: {
+          m: "dsfsd"
+        },
+        success: () => {
+          that.conn_open = "连接打开" + "send succeed"
+
+          console.log(`handling success`)
+        },
+        fail: (data) => {
+          that.conn_open = "连接打开" + data
+
+          console.log(`handling fail, errMsg = ${data.data}, errCode = ${data.code}`)
+        }
+      })
+
+      conn.getReadyState({
+        success: (data) => {
+          console.log(data)
+          that.device_code = data
+
+          if (data.status === 1) {
+            console.log("连接成功")
+            that.device_status = "设备连接成功"
+            that.device_connect = true
+            that.device_status2 = "成功"
+          } else {
+            console.log("连接失败")
+            that.device_status = "设备连接失败"
+            that.device_status2 = "失败"
+          }
+        },
+        fail: (data, code) => {
+          console.log(`handling fail, code = ${code}`)
+
+          that.device_status = "设备出现问题"
+        }
+      })
+    }
+    conn.onmessage = (data) => {
+      that.codestr = JSON.parse(data.data)
+      that.codestrtype = typeof that.codestr
+      vibrator.vibrate({
+        mode: "short"
+      })
+      console.log(`received message: ${data.data}`)
+      conn.send({
+        data: "OK",
+        success: () => {
+          console.log(`handling success`)
+        },
+        fail: (data) => {
+          console.log(`handling fail, errMsg = ${data.data}, errCode = ${data.code}`)
+        }
+      })
+    }
+    conn.onclose = (data) => {
+      console.log(`connection closed, reason = ${data.data}, code = ${data.code}`)
+    }
+    conn.onerror = (data) => {
+      console.log(`connection error, errMsg = ${data.data}, errCode = ${data.code}`)
+    }
+  }
+}
+</script>
+
+<style>
+.safe-area {
+  margin: 10%;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: start;
+  border-radius: 10%;
+}
+
+.head-bar {
+  width: 100%;
+  font-size: 25px;
+  box-sizing: border-box;
+  text-align: center;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.demo-page {
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: start;
+  padding: 25px;
+  background-color: black;
+}
+
+.title {
+  font-size: 40px;
+  color: white;
+  text-align: center;
+  width: 100%;
+}
+
+.title2 {
+  font-size: 35px;
+  color: white;
+  text-align: center;
+  width: 100%;
+  margin-bottom: 15px;
+}
+
+.btn {
+  width: 150px;
+  height: 150px;
+  border-radius: 999px;
+  margin-top: 20px;
+  background-color: #5e5e5e;
+  font-size: 30px;
+  color: #ffffff;
+}
+
+.btn2 {
+  width: 160px;
+  height: 80px;
+  border-radius: 50%;
+  background-color: #3d3d3d;
+  font-size: 30px;
+  color: #ffffff;
+  padding: 5px;
+}
+
+.codes {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin: 20px;
+}
+
+.code {
+  color: white;
+  background-color: #3d3d3d;
+  border-radius: 20px;
+  padding: 20px;
+  margin-top: 10px;
+}
+
+.btn3 {
+  width: 50%;
+  height: 80px;
+  border-radius: 50%;
+  background-color: #3d3d3d;
+  font-size: 30px;
+  color: #ffffff;
+  padding: 5px;
+}
+</style>

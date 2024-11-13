@@ -1,0 +1,166 @@
+<template>
+  <div class="demo">
+    <div class="demo-page" if="{{ !connected }}">
+      <div class="t">
+        <text class="title">{{ appinfo.name }}</text>
+        <text class="title">{{ appinfo.versionName }} ({{ appinfo.versionCode }})</text>
+      </div>
+      <div class="t2">
+        <text class="title2">{{ developer }}</text>
+        <block for="{{users}}">
+          <text class="title1">{{ $item }}</text>
+        </block>
+        <text class="title2">{{ media }}</text>
+        <block for="{{medias}}">
+          <text class="title1">{{ $item }}</text>
+        </block>
+      </div>
+      <input class="btn3" type="button" value="<" onclick="aboutme" />
+    </div>
+    <div class="demo-page" if="{{connected }}">
+
+    </div>
+  </div>
+</template>
+
+<script>
+import app from "@system.app"
+
+import device from "@system.device"
+import router from "@system.router"
+export default {
+  private: {
+    text: "腕上取件码",
+    version: "1.0.0",
+    developer: "开发人员列表：",
+    users: ["@Syutung"],
+    media: "社交媒体：",
+    device: "设备信息",
+    medias: [
+      "抖音@开放学术共同体",
+      "bilibili@爱写bug的小王_BI3ANU",
+      "知乎@开放学术共同体",
+      "微博@开放学术共同体",
+      "小红书@写bug的小王同学"
+    ],
+    device_info: {},
+    osType: "",
+    show: true,
+    infoshow: false,
+    osType: "",
+    model: "",
+    manufacturer: "",
+    brand: "",
+    osVersionName: "",
+    osVersionCode: "",
+    platformVersionName: "",
+    APILevel: "",
+    appinfo: null,
+  },
+  aboutme() {
+    router.back()
+  },
+ 
+  onInit() {
+    let that = this
+    that.appinfo = app.getInfo()
+    // { packageName: string; icon: string; name: string; versionName: string;
+    // versionCode: number; logLevel: string; source:
+    // { packageName: string; type: string; extra: object; }; }
+    device.getInfo({
+      success: function (ret) {
+        console.log(`handling success， brand = ${ret.osType}`)
+        that.osType = ret.osType
+        that.model = ret.model
+        that.manufacturer = ret.manufacturer
+        that.brand = ret.brand
+        that.osVersionName = ret.osVersionName
+        that.osVersionCode = ret.osVersionCode
+        that.platformVersionName = ret.platformVersionName
+        that.APILevel = ret.APILevel
+      }
+    })
+  }
+}
+</script>
+
+<style>
+.t2 {
+  height: 60%;
+  width: 100%;
+  border-radius: 30px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: start;
+  align-items: self-start;
+}
+
+.t {
+  background-color: rgb(5, 89, 178);
+  height: 20%;
+  width: 100%;
+  border-radius: 30px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: start;
+  align-items: self-start;
+}
+
+.demo {
+  flex-direction: column;
+  justify-content: start;
+  align-items: center;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  background-color: black;
+}
+
+.demo-page {
+  flex-direction: column;
+  justify-content: start;
+  align-items: center;
+  display: flex;
+  width: 100%;
+  height: 150%;
+
+  padding: 30px;
+  background-color: black;
+}
+
+.title {
+  font-size: 30px;
+  text-align: start;
+  color: white;
+  width: 100%;
+}
+
+.title1 {
+  font-size: 25px;
+  text-align: start;
+  color: white;
+  width: 100%;
+}
+
+.title2 {
+  font-size: 35px;
+  text-align: start;
+  color: white;
+  width: 100%;
+  margin-top: 10px;
+}
+
+.btn3 {
+  width: 80px;
+  height: 80px;
+  border-radius: 999px;
+  border-radius: 50%;
+  background-color: #505050;
+  font-size: 20px;
+  margin: 10px;
+  color: white;
+  padding: 5px;
+}
+</style>

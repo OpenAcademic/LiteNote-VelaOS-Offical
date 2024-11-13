@@ -1,0 +1,11 @@
+/.nyc_output
+/coverage
+/node_modules
+/sign
+/dist
+/build
+.husky/
+/build 
+/build 2
+/build 3
+/build 4

@@ -1,0 +1,426 @@
+<template>
+  <div>
+  <block if="{{!connected}}">
+    <div class="demo-page">
+      <block if="{{codestr.length !== 0}}">
+        <text class="num">{{ curr_index + 1 }}/{{ codestr.length }}</text>
+
+        <div class="code">
+          <text class="kd">{{ codestr[curr_index].kd }}快递</text>
+          <text class="code_size">{{ codestr[curr_index].code }}</text>
+          <text class="yz">已放到{{ codestr[curr_index].yz }}</text>
+          <input class="btn2" type="button" value="取" onclick="getExpress" />
+          <text class="demo">取件后该记录会被删除，请到手机找回</text>
+        </div>
+        <input class="btn" type="button" value="下一个" onclick="nextData" />
+        <input class="btn3" type="button" value="关于我们" onclick="aboutme" />
+      </block>
+      <block else="">
+        <text class="title">暂无数据</text>
+        <text class="title2">请前往小米应用商店下载《轻笔记》和 《小米运动健康APP》</text>
+        <qrcode style="width: 80%" class="qrcode" value="https://www.123865.com/s/Edjvjv-eluAv"></qrcode>
+        <input class="btn3" type="button" value="关于我们" onclick="aboutme" />
+      </block>
+    </div>
+  </block>
+  <block else>
+    <div class="demo-page">
+      <block if="{{codestr}}">
+        <text class="title">您有新的{{ codestr.kd }}快递到达{{ codestr.yz }}</text>
+        <div class="codes">
+          <div for="{{codestr.codes}}" class="codep">
+            <text>{{ $item }}</text>
+          </div>
+        </div>
+        <input class="btn" type="button" value="保存" onclick="saveData" />
+      </block>
+      <block else="">
+        <text class="title">等待数据传输</text>
+      </block>
+    </div>
+  </block>
+</div>
+</template>
+
+<script>
+import router from "@system.router"
+import configuration from "@system.configuration"
+import app from "@system.app"
+const interconnect = require("@system.interconnect")
+let conn = null
+import storage from "@system.storage"
+import vibrator from "@system.vibrator"
+import prompt from "@system.prompt"
+export default {
+  // 页面级组件的数据模型，影响传入数据的覆盖机制：private内定义的属性不允许被覆盖
+  private: {
+    title: "腕上取件码",
+    codestrtype: "",
+    codestr: {
+      codes: ["34-1023", "34-1023", "34-1023"],
+      yz: "菜鸟驿站朝鲜平壤店",
+      kd: "自由"
+    },
+    curr_index: 0,
+    device_status: "",
+    device_connect: false,
+    device_code: "",
+    conn: null,
+    device_status2: "",
+    conn_open: "false",
+    connected: false
+  },
+  onConnect() {
+    let that = this
+
+    this.device_status2 = "创建连接哦之前"
+    //this.codestr = {
+    //  codes:["3432434","34-98-3432","34-102-1033"],
+    //  yz:"丰巢快递柜",
+    //  kd:"顺丰"
+    //}
+
+    conn = interconnect.instance()
+    this.device_status2 = "创建连接对象"
+
+    this.conn = conn
+    this.device_status2 = "连接中"
+
+    conn.onopen = () => {
+      that.conn_open = "连接打开"
+      console.log(`connection opened`)
+      conn.send({
+        data: {
+          m: "dsfsd"
+        },
+        success: () => {
+          that.conn_open = "连接打开" + "send succeed"
+
+          console.log(`handling success`)
+        },
+        fail: (data) => {
+          that.conn_open = "连接打开" + data
+
+          console.log(`handling fail, errMsg = ${data.data}, errCode = ${data.code}`)
+        }
+      })
+
+      conn.getReadyState({
+        success: (data) => {
+          console.log(data)
+          that.device_code = data
+
+          if (data.status === 1) {
+            console.log("连接成功")
+            that.device_status = "设备连接成功"
+            that.device_connect = true
+            that.device_status2 = "成功"
+          } else {
+            console.log("连接失败")
+            that.device_status = "设备连接失败"
+            that.device_status2 = "失败"
+          }
+        },
+        fail: (data, code) => {
+          console.log(`handling fail, code = ${code}`)
+
+          that.device_status = "设备出现问题"
+        }
+      })
+    }
+    conn.onmessage = (data) => {
+      that.connected = true
+      that.codestr = JSON.parse(data.data)
+      that.codestrtype = typeof that.codestr
+      vibrator.vibrate({
+        mode: "short"
+      })
+      console.log(`received message: ${data.data}`)
+      conn.send({
+        data: "OK",
+        success: () => {
+          console.log(`handling success`)
+        },
+        fail: (data) => {
+          console.log(`handling fail, errMsg = ${data.data}, errCode = ${data.code}`)
+        }
+      })
+    }
+    conn.onclose = (data) => {
+      console.log(`connection closed, reason = ${data.data}, code = ${data.code}`)
+    }
+    conn.onerror = (data) => {
+      console.log(`connection error, errMsg = ${data.data}, errCode = ${data.code}`)
+    }
+  },
+  routeBack() {
+    app.terminate()
+  },
+  saveData() {
+    let codes = this.codestr.codes
+    let yz = this.codestr.yz
+    let kd = this.codestr.kd
+
+    storage.get({
+      key: "data",
+      default: "[]",
+      success: function (data) {
+        console.log("handling success")
+        // 将 str 解析成 object 数组
+        let code_orgin = JSON.parse(data)
+
+        for (let i = 0; i < codes.length; i++) {
+          // 检查 code 是否已经存在
+          let obj = {
+            code: codes[i],
+            kd: kd,
+            yz: yz,
+            status: 0
+          }
+          let index = code_orgin.indexOf(obj)
+          console.info(index)
+          if (index !== -1) {
+            console.info("该取件码已存在")
+
+            prompt.showToast({
+              message: "该取件码已存在",
+              duration: 1500
+            })
+            continue
+          }
+
+          code_orgin.push(obj)
+        }
+        storage.set({
+          key: "data",
+          value: JSON.stringify(code_orgin),
+          success: function (data) {
+            console.log("handling success")
+            app.terminate()
+          },
+          fail: function (data, code) {
+            console.log(`handling fail, code = ${code}`)
+            prompt.showToast({
+              message: "保存出错",
+              duration: 1500
+            })
+          }
+        })
+      },
+      fail: function (data, code) {
+        console.log(`handling fail, code = ${code}`)
+      }
+    })
+  },
+  nextData() {
+    this.curr_index = (this.curr_index + 1) % this.codestr.length
+  },
+  aboutme() {
+    router.push({
+      uri: "pages/detail"
+    })
+  },
+  getExpress() {
+    this.codestr.splice(this.curr_index, 1)
+    let that = this
+    storage.set({
+      key: "data",
+      value: JSON.stringify(this.codestr),
+      success: function (data) {
+        console.log("handling success")
+        prompt.showToast({
+          message: "取件成功",
+          duration: 1500
+        })
+        that.curr_index = 0
+        that.getData()
+      },
+      fail: function (data, code) {
+        console.log(`handling fail, code = ${code}`)
+        prompt.showToast({
+          message: "保存出错",
+          duration: 1500
+        })
+      }
+    })
+  },
+  getData() {
+    let that = this
+
+    storage.get({
+      key: "data",
+      default: "[]",
+      success: function (data) {
+        console.log("handling success")
+        // 将 str 解析成 object 数组
+        let code_orgin = JSON.parse(data)
+        that.codestr = code_orgin
+      },
+      fail: function (data, code) {
+        console.log(`handling fail, code = ${code}`)
+      }
+    })
+  },
+  onInit() {
+    this.onConnect()
+  },
+  onShow() {
+    let that = this
+    this.getData()
+  }
+}
+</script>
+
+<style>
+.num {
+  font-size: 30px;
+  color: white;
+}
+
+.demoppp {
+  height: 200%;
+}
+
+.code_size {
+  font-size: 50px;
+  color: white;
+}
+
+.kd {
+  font-size: 26px;
+  color: white;
+  text-align: center;
+}
+
+.qrcode {
+  margin-top: 20px;
+  border-radius: 10px;
+}
+
+.demo {
+  font-size: 18px;
+  color: white;
+  text-align: center;
+  margin-top: 20px;
+}
+
+.yz {
+  font-size: 30px;
+  color: white;
+}
+
+.safe-area {
+  margin: 10%;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: start;
+  border-radius: 10%;
+}
+
+.head-bar {
+  width: 100%;
+  font-size: 25px;
+  box-sizing: border-box;
+  text-align: center;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.demo-page {
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  height: 150%;
+
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: start;
+  padding: 25px;
+  background-color: black;
+}
+
+.title {
+  font-size: 40px;
+  color: white;
+  text-align: center;
+  width: 100%;
+}
+
+.title2 {
+  font-size: 26px;
+  color: white;
+  text-align: center;
+  width: 100%;
+  margin-bottom: 15px;
+  margin-top: 15px;
+}
+
+.btn {
+  width: 100%;
+  height: 50px;
+  border-radius: 15px;
+  margin-top: 20px;
+  background-color: #5e5e5e;
+  font-size: 30px;
+  color: #ffffff;
+}
+
+.btn2 {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background-color: #209f03;
+  font-size: 30px;
+  margin-top: 20px;
+  color: #ffffff;
+  padding: 5px;
+}
+
+.codes {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin: 20px;
+}
+.codep {
+  color: white;
+  background-color: #3d3d3d;
+  border-radius: 20px;
+  padding: 20px;
+  margin-top: 10px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.code {
+  color: white;
+  background-color: #3d3d3d;
+  border-radius: 20px;
+  padding: 20px;
+  margin-top: 10px;
+  width: 100%;
+  height: 400px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.btn3 {
+  width: 50%;
+  border-radius: 50%;
+  background-color: #000000;
+  font-size: 20px;
+  margin-top: 10px;
+  color: #ffffff;
+  padding: 5px;
+}
+</style>
